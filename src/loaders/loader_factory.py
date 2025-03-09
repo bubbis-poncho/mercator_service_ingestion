@@ -1,10 +1,10 @@
-
 from typing import Dict, Any, Optional, Type
 
 from .base_loader import BaseLoader
 from .iceberg_loader import IcebergLoader
 from .postgres_loader import PostgresLoader
 from .delta_lake_loader import DeltaLakeLoader
+from .hugegraph_loader import HugegraphLoader
 
 class LoaderFactory:
     """
@@ -15,7 +15,11 @@ class LoaderFactory:
     _loaders = {
         'iceberg': IcebergLoader,
         'postgres': PostgresLoader,
+        'postgresql': PostgresLoader,
         'delta': DeltaLakeLoader,
+        'delta_lake': DeltaLakeLoader,
+        'hugegraph': HugegraphLoader,
+        'graph': HugegraphLoader,
     }
     
     @classmethod
@@ -24,7 +28,7 @@ class LoaderFactory:
         Get a loader instance of the specified type.
         
         Args:
-            loader_type: Type of loader ('iceberg', 'postgres', 'delta')
+            loader_type: Type of loader ('iceberg', 'postgres', 'delta', 'hugegraph')
             config: Loader configuration
             
         Returns:

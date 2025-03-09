@@ -1,6 +1,6 @@
 # Data Ingestion Service
 
-A modular and extensible service for ingesting data from multiple sources and storing it in Apache Iceberg format.
+A modular and extensible service for ingesting data from multiple sources and storing it in various formats.
 
 ## Features
 
@@ -16,9 +16,11 @@ A modular and extensible service for ingesting data from multiple sources and st
   - Column mapping
   - Custom transformations
 
-- **Powerful storage**:
-  - Apache Iceberg (default)
-  - Extensible to other storage formats
+- **Multiple storage options**:
+  - Apache Iceberg (data lake format)
+  - PostgreSQL (relational database)
+  - Hugegraph (graph database)
+  - Easily extendable to support other formats
 
 - **Advanced scheduling**:
   - Cron-based scheduling
@@ -45,44 +47,22 @@ The service is built around these main components:
 ### Prerequisites
 
 - Python 3.8+
-- Java 11+ (for Apache Spark/Iceberg)
-- Docker (optional)
+- Docker
+- Docker Compose
 
 ### Installation
-
-#### Using Docker (recommended)
-
-```bash
-# Build the Docker image
-docker build -t data-ingestion-service .
-
-# Run the service
-docker run -d \
-  -p 8000:8000 \
-  -v $(pwd)/config:/app/config \
-  -v $(pwd)/metadata:/app/metadata \
-  -v /path/to/warehouse:/warehouse/tablespace/external/hive \
-  --name data-ingestion-service \
-  data-ingestion-service
-```
-
-#### Manual Installation
 
 ```bash
 # Clone the repository
 git clone https://github.com/yourusername/data-ingestion-service.git
 cd data-ingestion-service
 
-# Create a virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Run the service
-python src/main.py
+# Run the setup script (interactive)
+chmod +x setup.sh
+./setup.sh
 ```
+
+The setup script will guide you through configuring your data ingestion service, including selecting which storage systems to enable (Iceberg, PostgreSQL, Hugegraph).
 
 ### Configuration
 
@@ -93,6 +73,84 @@ The service is configured using YAML files:
 3. Define source configurations in the `config/sources` directory
 
 See the `config` directory for examples.
+
+## Storage Options
+
+### Apache Iceberg
+
+[Apache Iceberg](https://iceberg.apache.org/) is an open table format for huge analytic datasets. It provides:
+
+- Schema evolution
+- Hidden partitioning
+- Time travel and snapshot isolation
+- Full SQL support
+
+To use Iceberg storage, configure your job with:
+
+```yaml
+loader:
+  type: "iceberg"
+  database: "your_database"
+  table: "your_table"
+  write_mode: "append"  # or "overwrite", "merge"
+  config:
+    spark_config:
+      spark.driver.memory: "4g"
+      spark.executor.memory: "4g"
+    catalog_name: "hive_prod"
+    warehouse_location: "/warehouse/tablespace/external/hive"
+```
+
+### PostgreSQL
+
+PostgreSQL is a powerful, open-source relational database system with over 30 years of active development. Use it when you need:
+
+- Relational data structure
+- ACID compliance
+- Complex queries
+- Strong data consistency
+
+To use PostgreSQL storage, configure your job with:
+
+```yaml
+loader:
+  type: "postgres"
+  host: "${POSTGRES_HOST:-postgres}"
+  port: "${POSTGRES_PORT:-5432}"
+  username: "${POSTGRES_USER:-postgres}"
+  password: "${POSTGRES_PASSWORD:-postgres}"
+  database: "${POSTGRES_DB:-ingestion}"
+  schema: "public"
+  table: "your_table"
+  write_mode: "append"  # or "replace", "merge"
+  merge_keys:  # Required for "merge" mode
+    - "id_column"
+```
+
+### Hugegraph
+
+[Hugegraph](https://hugegraph.apache.org/docs/quickstart/) is a graph database designed for storing complex, highly connected data. Perfect for:
+
+- Social networks
+- Knowledge graphs
+- Recommendation systems
+- Pattern recognition
+
+To use Hugegraph storage, configure your job with:
+
+```yaml
+loader:
+  type: "hugegraph"
+  host: "${HUGEGRAPH_HOST:-hugegraph}"
+  port: "${HUGEGRAPH_PORT:-8080}"
+  graph: "${HUGEGRAPH_GRAPH:-ingestion}"
+  data_type: "vertex"  # or "edge" for relationships
+  # For vertices:
+  auto_create_schema: true
+  # For edges:
+  source_key: "from_id"  # Column with source vertex ID
+  target_key: "to_id"    # Column with target vertex ID
+```
 
 ## Usage
 
@@ -119,24 +177,24 @@ The service exposes the following REST API endpoints:
 curl -X POST "http://localhost:8000/jobs" \
   -H "Content-Type: application/json" \
   -d '{
-    "job_id": "daily_sales",
+    "job_id": "financial_data",
     "job_config": {
       "enabled": true,
       "cron_expression": "0 5 * * *",
       "source": {
-        "type": "csv",
-        "source_path": "/data/incoming/reports/",
-        "file_pattern": "daily_sales_*.csv"
+        "type": "api",
+        "base_url": "https://api.example.com/v1",
+        "endpoint": "financial-data"
       },
       "transformer": {
         "type": "base",
         "date_columns": ["date"],
-        "numeric_columns": ["quantity", "revenue"]
+        "numeric_columns": ["amount", "fee"]
       },
       "loader": {
-        "type": "iceberg",
-        "database": "sales_data",
-        "table": "daily_sales"
+        "type": "postgres",
+        "database": "financial_data",
+        "table": "transactions"
       }
     }
   }'
@@ -148,13 +206,34 @@ curl -X POST "http://localhost:8000/jobs" \
 curl -X POST "http://localhost:8000/jobs/execute" \
   -H "Content-Type: application/json" \
   -d '{
-    "job_id": "daily_sales",
+    "job_id": "financial_data",
     "parameters": {
       "source": {
-        "file_pattern": "daily_sales_2023-03-*.csv"
+        "endpoint": "financial-data/daily"
       }
     }
   }'
+```
+
+## Customizing Docker Compose
+
+You can enable or disable specific storage systems by modifying the environment variables in the `.env` file:
+
+```
+# .env file
+ENABLE_ICEBERG=true
+ENABLE_POSTGRES=true
+ENABLE_HUGEGRAPH=false
+```
+
+Or start Docker Compose with specific profiles:
+
+```bash
+# Start with only PostgreSQL support
+docker-compose --profile postgres up -d
+
+# Start with both Iceberg and Hugegraph
+docker-compose --profile iceberg --profile hugegraph up -d
 ```
 
 ## Development
@@ -198,117 +277,11 @@ data-ingestion-service/
 │   └── main.py                # Application entry point
 ├── metadata/                  # Job metadata and state tracking
 ├── Dockerfile                 # Docker configuration
+├── docker-compose.yml         # Docker Compose configuration
 ├── requirements.txt           # Python dependencies
 └── README.md                  # This file
 ```
 
-## Configuration Reference
+## Contributing
 
-### Job Configuration
-
-```yaml
-# Basic job settings
-enabled: true                   # Whether the job is enabled
-cron_expression: "0 3 * * *"    # When to run the job (cron format)
-type: "generic"                 # Job type (generic, fsa_insider_trading)
-
-# Source configuration - where the data comes from
-source:
-  type: "api"                   # Type of source (api, db, file, web_scraper)
-  # Source-specific configuration...
-
-# Transformer configuration - how to process the data
-transformer:
-  type: "base"                  # Type of transformer
-  date_columns: []              # Columns to convert to dates
-  numeric_columns: []           # Columns to convert to numbers
-  # Transformer-specific configuration...
-
-# Loader configuration - where to store the data
-loader:
-  type: "iceberg"               # Type of loader (iceberg, postgres, delta)
-  database: "my_database"       # Target database
-  table: "my_table"             # Target table
-  write_mode: "append"          # Write mode (append, overwrite, merge)
-  # Loader-specific configuration...
-
-# Monitoring configuration - alerts and notifications
-monitoring:
-  alert_on_failure: true        # Send alert on job failure
-  alert_on_zero_records: true   # Send alert when no records are processed
-  notification_channels:        # Where to send notifications
-    - slack
-    - email
-  # Monitoring-specific configuration...
-
-# Metadata for documentation and organization
-metadata:
-  owner: "Data Team"            # Team or person responsible
-  contact_email: "data@example.com"  # Contact information
-  tags:                         # Organization tags
-    - "financial"
-    - "daily"
-```
-
-### Source Types
-
-#### API Source
-
-```yaml
-source:
-  type: "api"
-  base_url: "https://api.example.com/v1"
-  endpoint: "data"
-  auth_type: "bearer"           # none, basic, bearer, api_key
-  auth_config:
-    token: "${API_TOKEN}"
-  pagination_strategy: "page"   # none, page, offset, cursor
-  # More API-specific configuration...
-```
-
-#### Database Source
-
-```yaml
-source:
-  type: "postgresql"            # postgresql, mysql, sqlite, oracle, mssql
-  host: "db.example.com"
-  port: 5432
-  username: "${DB_USER}"
-  password: "${DB_PASSWORD}"
-  database: "source_db"
-  schema: "public"
-  table: "customers"            # Optional - can use custom query instead
-  # Database-specific configuration...
-```
-
-#### File Source
-
-```yaml
-source:
-  type: "csv"                   # csv, json, excel, xml, parquet, avro, orc
-  source_path: "/data/files/"
-  file_pattern: "*.csv"
-  incremental: true             # Only process new/changed files
-  # File-specific configuration...
-```
-
-#### Web Scraper Source
-
-```yaml
-source:
-  type: "web_scraper"
-  base_url: "https://example.com/data"
-  user_agent: "Mozilla/5.0..."
-  requests_per_minute: 6
-  # Web scraper-specific configuration...
-```
-
-## Environment Variables
-
-The service supports the following environment variables:
-
-- `JOB_CONFIG_PATH`: Path to job configuration file or directory
-- `API_PORT`: Port for the API server (default: 8000)
-- `API_HOST`: Host for the API server (default: 0.0.0.0)
-- `ICEBERG_WAREHOUSE_LOCATION`: Location for Iceberg data files
-
+Contributions are welcome! Please feel free to submit a Pull Request.
