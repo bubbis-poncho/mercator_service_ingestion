@@ -1,0 +1,49 @@
+# Base template for all data sources
+template: base_source
+version: 1.0
+enabled: true
+
+# Schedule (can be overridden)
+cron_expression: "0 3 * * *"  # Default: 3 AM daily
+
+# Scraper defaults
+scraper:
+  default_timeout: 30
+  requests_per_minute: 10
+  random_delay: true
+  retry_attempts: 3
+  retry_backoff: 2
+  user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+
+# Transformer defaults  
+transformer:
+  type: "base"
+  validate_schema: true
+  handle_missing_values: "fill_null"
+  date_format: "%Y-%m-%d"
+
+# Loader defaults
+loader:
+  type: "iceberg"
+  batch_size: 1000
+  write_mode: "append"
+  config:
+    spark_config:
+      spark.driver.memory: "4g"
+      spark.executor.memory: "4g"
+    catalog_name: "hive_prod"
+    warehouse_location: "/warehouse/tablespace/external/hive"
+    
+# Monitoring defaults
+monitoring:
+  alert_on_failure: true
+  alert_on_zero_records: true
+  notification_channels:
+    - slack
+    - email
+  notify_owners: true
+
+# Security defaults
+security:
+  data_classification: "internal"
+  requires_encryption: false

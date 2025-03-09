@@ -1,0 +1,42 @@
+source_id: "swedish_fsa_insider"
+name: "Swedish FSA Insider Trading Data"
+description: "Insider trading data from the Swedish Financial Supervisory Authority"
+inherits: compliance_source
+version: 1.0
+
+# Source-specific overrides
+cron_expression: "0 5 * * *"  # 5 AM daily
+
+# Scraper configuration
+scraper:
+  type: "web_scraper"
+  module: "fsa_scraper"
+  base_url: "https://fi.se/en/our-registers/insynshandel/"
+  
+# Transformer configuration
+transformer:
+  type: "fsa"
+  date_columns:
+    - "Publiceringsdatum"
+    - "Transaktionsdatum"
+  numeric_columns:
+    - "Volym"
+    - "Pris"
+    - "Volymsenhet"
+
+# Loader configuration
+loader:
+  type: "iceberg"
+  database: "financial_data"
+  table: "insider_trading"
+
+# Ownership information
+metadata:
+  owner: "Compliance Team"
+  contact_email: "compliance@company.com"
+  data_steward: "John Smith"
+  tags:
+    - "insider_trading"
+    - "regulatory"
+    - "compliance"
+    - "sweden"

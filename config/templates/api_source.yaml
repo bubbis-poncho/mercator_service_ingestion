@@ -1,0 +1,18 @@
+# Template for API data sources
+template: api_source
+inherits: base_source
+version: 1.0
+
+# API-specific scraper settings
+scraper:
+  type: "api"
+  authentication_method: "bearer_token"
+  token_refresh_enabled: true
+  pagination_strategy: "offset"
+  rate_limit_strategy: "adaptive"
+  
+# API-specific monitoring
+monitoring:
+  check_api_health: true
+  monitor_rate_limits: true
+  alert_on_auth_issues: true

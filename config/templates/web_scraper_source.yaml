@@ -1,0 +1,19 @@
+# Template for web scraper sources
+template: web_scraper_source
+inherits: base_source
+version: 1.0
+
+# Override scraper for web sources
+scraper:
+  type: "web_scraper"
+  requests_per_minute: 6  # More conservative rate limiting
+  random_delay: true
+  javascript_required: false
+  handle_pagination: true
+  extract_tables: true
+  capture_links: false
+  
+# Web scraper specific monitoring
+monitoring:
+  check_for_website_changes: true
+  alert_on_structure_change: true
