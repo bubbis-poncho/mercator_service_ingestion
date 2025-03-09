@@ -1,0 +1,263 @@
+# Example API data ingestion job configuration
+enabled: true
+cron_expression: "0 3 * * *"  # Run daily at 3 AM
+
+# Source configuration
+source:
+  type: "api"
+  base_url: "https://api.example.com/v1"
+  endpoint: "financial-data"
+  auth_type: "bearer"
+  auth_config:
+    token: "${API_TOKEN}"  # Environment variable reference
+    refresh_config:
+      url: "https://api.example.com/v1/auth/refresh"
+      method: "POST"
+      data:
+        refresh_token: "${REFRESH_TOKEN}"
+      token_path: "access_token"
+  pagination_strategy: "page"
+  page_param: "page"
+  params:
+    limit: 100
+    data_type: "transactions"
+  random_delay: true
+  timeout: 30
+
+# Transformer configuration
+transformer:
+  type: "base"
+  date_columns:
+    - "transaction_date"
+    - "settlement_date"
+  numeric_columns:
+    - "amount"
+    - "fee"
+  validate_schema: true
+  handle_missing_values: "fill_null"
+
+# Loader configuration
+loader:
+  type: "iceberg"
+  database: "financial_data"
+  table: "transactions"
+  write_mode: "append"
+  batch_size: 1000
+  config:
+    spark_config:
+      spark.driver.memory: "4g"
+      spark.executor.memory: "4g"
+    catalog_name: "hive_prod"
+    warehouse_location: "/warehouse/tablespace/external/hive"
+
+# Monitoring configuration
+monitoring:
+  alert_on_failure: true
+  alert_on_zero_records: true
+  notification_channels:
+    - slack
+    - email
+  notify_owners: true
+
+# Metadata
+metadata:
+  owner: "Data Team"
+  contact_email: "data@example.com"
+  data_steward: "John Smith"
+  tags:
+    - "financial"
+    - "transactions"
+    - "external"
+
+# config/jobs/db_example.yaml
+# Example database ingestion job configuration
+enabled: true
+cron_expression: "0 4 * * *"  # Run daily at 4 AM
+
+# Source configuration
+source:
+  type: "postgresql"
+  host: "db.example.com"
+  port: 5432
+  username: "${DB_USER}"
+  password: "${DB_PASSWORD}"
+  database: "source_db"
+  schema: "public"
+  table: "customers"
+  columns:
+    - "customer_id"
+    - "name"
+    - "email"
+    - "created_at"
+    - "updated_at"
+  where_clause: "updated_at > :last_run"
+  where_params:
+    last_run: "${LAST_RUN_DATE}"  # Will be replaced at runtime
+
+# Transformer configuration
+transformer:
+  type: "base"
+  date_columns:
+    - "created_at"
+    - "updated_at"
+  handle_missing_values: "fill_null"
+
+# Loader configuration
+loader:
+  type: "iceberg"
+  database: "customer_data"
+  table: "customers"
+  write_mode: "merge"  # Upsert records
+  batch_size: 10000
+  merge_keys:
+    - "customer_id"
+
+# Monitoring configuration
+monitoring:
+  alert_on_failure: true
+  alert_on_zero_records: false
+  notification_channels:
+    - slack
+  notify_owners: true
+
+# Metadata
+metadata:
+  owner: "Customer Analytics Team"
+  contact_email: "analytics@example.com"
+  tags:
+    - "customer"
+    - "core"
+
+# config/jobs/web_scraper_example.yaml
+# Example web scraper job configuration
+enabled: true
+cron_expression: "0 2 * * *"  # Run daily at 2 AM
+
+# Source configuration
+source:
+  type: "web_scraper"
+  base_url: "https://example.com/prices"
+  user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+  requests_per_minute: 6
+  random_delay: true
+  timeout: 30
+  pagination:
+    enabled: true
+    next_page_xpath: "//a[@class='pagination-next']/@href"
+    max_pages: 10
+  extraction:
+    table_xpath: "//table[@class='price-table']"
+    item_xpath: "//div[@class='product-item']"
+    fields:
+      product_name: ".//h3[@class='product-title']/text()"
+      price: ".//span[@class='price']/text()"
+      currency: ".//span[@class='currency']/text()"
+      updated_date: ".//meta[@itemprop='dateModified']/@content"
+
+# Transformer configuration
+transformer:
+  type: "base"
+  date_columns:
+    - "updated_date"
+  numeric_columns:
+    - "price"
+  validate_schema: true
+
+# Loader configuration
+loader:
+  type: "iceberg"
+  database: "market_data"
+  table: "product_prices"
+  write_mode: "overwrite_partition"
+  partition_by: "updated_date"
+
+# Monitoring configuration
+monitoring:
+  alert_on_failure: true
+  alert_on_zero_records: true
+  alert_on_structure_change: true
+  notification_channels:
+    - slack
+    - email
+  notify_owners: true
+
+# Metadata
+metadata:
+  owner: "Market Intelligence Team"
+  contact_email: "intelligence@example.com"
+  data_steward: "Jane Doe"
+  tags:
+    - "pricing"
+    - "competitive_intel"
+    - "web_data"
+
+# config/jobs/file_example.yaml
+# Example file ingestion job configuration
+enabled: true
+cron_expression: "0 5 * * *"  # Run daily at 5 AM
+
+# Source configuration
+source:
+  type: "csv"
+  source_path: "/data/incoming/reports/"
+  file_pattern: "daily_sales_*.csv"
+  incremental: true
+  add_file_metadata: true
+  skip_errors: false
+  file_options:
+    delimiter: ","
+    encoding: "utf-8"
+    header: 0
+    parse_dates:
+      - "date"
+    dtype:
+      store_id: "str"
+      sku: "str"
+      quantity: "int"
+      revenue: "float"
+
+# Transformer configuration
+transformer:
+  type: "base"
+  date_columns:
+    - "date"
+  numeric_columns:
+    - "quantity"
+    - "revenue"
+  handle_missing_values: "fill_null"
+  transformations:
+    - add_column:
+        name: "unit_price"
+        formula: "revenue / quantity"
+    - rename_columns:
+        store_id: "location_id"
+    - filter:
+        condition: "quantity > 0"
+
+# Loader configuration
+loader:
+  type: "iceberg"
+  database: "sales_data"
+  table: "daily_sales"
+  write_mode: "append"
+  batch_size: 50000
+  partition_by: "date"
+
+# Monitoring configuration
+monitoring:
+  alert_on_failure: true
+  alert_on_zero_records: true
+  notification_channels:
+    - slack
+    - email
+  notify_owners: true
+
+# Metadata
+metadata:
+  owner: "Sales Analytics Team"
+  contact_email: "sales-analytics@example.com"
+  data_steward: "Mike Johnson"
+  tags:
+    - "sales"
+    - "daily"
+    - "reporting"
